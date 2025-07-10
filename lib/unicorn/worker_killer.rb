@@ -19,12 +19,30 @@ module Unicorn::WorkerKiller
     @@kill_attempts ||= 0
     @@kill_attempts += 1
 
+    # Execute before_kill callbacks
+    configuration.before_kill.each do |callback|
+      begin
+        callback.call(logger, start_time, worker_pid, @@kill_attempts)
+      rescue => e
+        logger.error "#{self} before_kill callback error: #{e.message}"
+      end
+    end
+
     sig = :QUIT
     sig = :TERM if @@kill_attempts > configuration.max_quit
     sig = :KILL if @@kill_attempts > configuration.max_term
 
     logger.warn "#{self} send SIG#{sig} (pid: #{worker_pid}) alive: #{alive_sec} sec (trial #{@@kill_attempts})"
     Process.kill sig, worker_pid
+
+    # Execute after_kill callbacks
+    configuration.after_kill.each do |callback|
+      begin
+        callback.call(logger, start_time, worker_pid, @@kill_attempts, sig)
+      rescue => e
+        logger.error "#{self} after_kill callback error: #{e.message}"
+      end
+    end
   end
 
   module Oom

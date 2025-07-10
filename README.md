@@ -43,6 +43,54 @@ The memory size check is done in every `check_cycle` requests.
 
 If `verbose` is set to true, then every memory size check will be shown in your logs.   This logging is done at the `info` level.
 
+## Configuration and Callbacks
+
+You can configure `unicorn-worker-killer` and add custom callbacks that execute before or after a worker is killed:
+
+```ruby
+# Configure unicorn-worker-killer with callbacks
+Unicorn::WorkerKiller.configure do |config|
+  config.max_quit = 10
+  config.max_term = 15
+  config.sleep_interval = 1
+  
+  # Add a callback to execute before killing a worker
+  config.before_kill_hook do |logger, start_time, worker_pid, kill_attempts|
+    logger.info "About to kill worker #{worker_pid} (attempt #{kill_attempts})"
+    # Add custom logic here, such as:
+    # - Logging to external monitoring system
+    # - Sending notifications
+    # - Cleaning up resources
+  end
+  
+  # Add a callback to execute after killing a worker
+  config.after_kill_hook do |logger, start_time, worker_pid, kill_attempts, signal|
+    logger.info "Sent #{signal} signal to worker #{worker_pid}"
+    # Add custom logic here, such as:
+    # - Recording metrics
+    # - Updating external systems
+    # - Additional cleanup
+  end
+end
+```
+
+### Callback Parameters
+
+**Before kill callbacks** receive:
+- `logger`: The logger instance
+- `start_time`: When the worker process started
+- `worker_pid`: The process ID of the worker being killed
+- `kill_attempts`: Number of kill attempts made so far
+
+**After kill callbacks** receive:
+- `logger`: The logger instance
+- `start_time`: When the worker process started
+- `worker_pid`: The process ID of the worker being killed
+- `kill_attempts`: Number of kill attempts made so far
+- `signal`: The signal that was sent (:QUIT, :TERM, or :KILL)
+
+Callbacks are executed in a safe manner - if a callback raises an exception, it will be logged as an error but won't prevent the worker from being killed.
+
 # Special Thanks
 
 - [@hotchpotch](http://github.com/hotchpotch/) for the [original idea](https://gist.github.com/hotchpotch/1258681)
